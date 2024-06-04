@@ -3,7 +3,7 @@ package linkedin
 import (
 	"fmt"
 	"net/http"
-	"net/url"
+	"strings"
 
 	errortools "github.com/leapforce-libraries/go_errortools"
 	go_http "github.com/leapforce-libraries/go_http"
@@ -51,7 +51,7 @@ type SearchAdAccountsConfig struct {
 	Status    *[]AdAccountStatus
 	Reference *[]string
 	Name      *[]string
-	Id        *[]int64
+	Id        *[]string
 	Type      *[]AdAccountType
 	Test      *bool
 	PageToken *string
@@ -59,44 +59,70 @@ type SearchAdAccountsConfig struct {
 }
 
 func (service *Service) SearchAdAccounts(config *SearchAdAccountsConfig) (*[]AdAccount, *errortools.Error) {
-	var values = url.Values{}
+	var params []string
 	var pageToken string
-	var pageSize uint = countDefault
+	var pageSize = countDefault
 
-	values.Set("q", "search")
+	params = append(params, "q=search")
 
 	var header = http.Header{}
 	header.Set(restliProtocolVersionHeader, defaultRestliProtocolVersion)
 
 	if config != nil {
+		var search []string
+
 		if config.Status != nil {
-			for i, status := range *config.Status {
-				values.Set(fmt.Sprintf("search.status.values[%v]", i), string(status))
+			var searchStatus []string
+
+			for _, status := range *config.Status {
+				searchStatus = append(searchStatus, string(status))
 			}
+
+			search = append(search, fmt.Sprintf("status:(values:List(%s))", strings.Join(searchStatus, ",")))
 		}
 		if config.Reference != nil {
-			for i, reference := range *config.Reference {
-				values.Set(fmt.Sprintf("search.reference.values[%v]", i), reference)
+			var searchReference []string
+
+			for _, reference := range *config.Reference {
+				searchReference = append(searchReference, reference)
 			}
+
+			search = append(search, fmt.Sprintf("reference:(values:List(%s))", strings.Join(searchReference, ",")))
 		}
 		if config.Name != nil {
-			for i, name := range *config.Name {
-				values.Set(fmt.Sprintf("search.name.values[%v]", i), name)
+			var searchName []string
+
+			for _, name := range *config.Name {
+				searchName = append(searchName, name)
 			}
+
+			search = append(search, fmt.Sprintf("name:(values:List(%s))", strings.Join(searchName, ",")))
 		}
 		if config.Id != nil {
-			for i, id := range *config.Id {
-				values.Set(fmt.Sprintf("search.id.values[%v]", i), fmt.Sprintf("%v", id))
+			var searchId []string
+
+			for _, id := range *config.Id {
+				searchId = append(searchId, fmt.Sprintf("%s", id))
 			}
+
+			search = append(search, fmt.Sprintf("id:(values:List(%s))", strings.Join(searchId, ",")))
 		}
 		if config.Type != nil {
-			for i, _type := range *config.Type {
-				values.Set(fmt.Sprintf("search.type.values[%v]", i), string(_type))
+			var searchType []string
+
+			for _, _type := range *config.Type {
+				searchType = append(searchType, fmt.Sprintf("%v", string(_type)))
 			}
+
+			search = append(search, fmt.Sprintf("id:(values:List(%s))", strings.Join(searchType, ",")))
 		}
 		if config.Test != nil {
-			values.Set("search.test", fmt.Sprintf("%v", *config.Test))
+			search = append(search, fmt.Sprintf("test:(values:List(%s))", fmt.Sprintf("%v", *config.Test)))
+
 		}
+
+		params = append(params, fmt.Sprintf("search=(%s)", strings.Join(search, ",")))
+
 		if config.PageToken != nil {
 			pageToken = *config.PageToken
 		}
@@ -105,19 +131,20 @@ func (service *Service) SearchAdAccounts(config *SearchAdAccountsConfig) (*[]AdA
 		}
 	}
 
-	adAccounts := []AdAccount{}
+	var adAccounts []AdAccount
 
 	for {
+		params_ := params
 		if pageToken != "" {
-			values.Set("pageToken", fmt.Sprintf("%v", pageToken))
+			params_ = append(params_, fmt.Sprintf("pageToken=%s", pageToken))
 		}
-		values.Set("pageSize", fmt.Sprintf("%v", pageSize))
+		params_ = append(params_, fmt.Sprintf("pageSize=%v", pageSize))
 
 		adAccountsResponse := AdAccountsResponse{}
 
 		requestConfig := go_http.RequestConfig{
 			Method:            http.MethodGet,
-			Url:               service.urlRest(fmt.Sprintf("adAccounts?%s", values.Encode())),
+			Url:               service.urlRest(fmt.Sprintf("adAccounts?%s", strings.Join(params_, "&"))),
 			ResponseModel:     &adAccountsResponse,
 			NonDefaultHeaders: &header,
 		}
@@ -149,26 +176,16 @@ func (service *Service) SearchAdAccounts(config *SearchAdAccountsConfig) (*[]AdA
 }
 
 func (service *Service) GetAdAccount(accountId int64) (*AdAccount, *errortools.Error) {
-	id := []int64{accountId}
-
-	accounts, e := service.SearchAdAccounts(&SearchAdAccountsConfig{
-		Id: &id,
-	})
+	var adAccount AdAccount
+	requestConfig := go_http.RequestConfig{
+		Method:        http.MethodGet,
+		Url:           service.urlRest(fmt.Sprintf("adAccounts/%v", accountId)),
+		ResponseModel: &adAccount,
+	}
+	_, _, e := service.versionedHttpRequest(&requestConfig, nil)
 	if e != nil {
 		return nil, e
 	}
 
-	if accounts == nil {
-		return nil, errortools.ErrorMessage("Account not found.")
-	}
-
-	if len(*accounts) == 0 {
-		return nil, errortools.ErrorMessage("Account not found.")
-	}
-
-	if len(*accounts) > 1 {
-		return nil, errortools.ErrorMessage("Multiple accounts found.")
-	}
-
-	return &(*accounts)[0], nil
+	return &adAccount, nil
 }

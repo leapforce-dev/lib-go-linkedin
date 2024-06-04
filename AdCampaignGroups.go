@@ -49,9 +49,9 @@ type SearchAdCampaignGroupsConfig struct {
 }
 
 func (service *Service) SearchAdCampaignGroups(config *SearchAdCampaignGroupsConfig) (*[]AdCampaignGroup, *errortools.Error) {
-	var values url.Values = url.Values{}
+	var values = url.Values{}
 	var pageToken string
-	var pageSize uint = countDefault
+	var pageSize = countDefault
 
 	values.Set("q", "search")
 
