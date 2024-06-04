@@ -7,6 +7,10 @@ type Paging struct {
 	//Total int    `json:"total"`
 }
 
+type MetaData struct {
+	NextPageToken string `json:"nextPageToken"`
+}
+
 type Link struct {
 	Type string `json:"type"`
 	Rel  string `json:"rel"`

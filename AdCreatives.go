@@ -10,7 +10,7 @@ import (
 )
 
 type AdCreativesResponse struct {
-	Paging   Paging       `json:"paging"`
+	MetaData MetaData     `json:"metadata"`
 	Elements []AdCreative `json:"elements"`
 }
 
@@ -135,16 +135,19 @@ type SearchAdCreativesConfig struct {
 	Reference *[]string
 	Status    *[]AdCreativeStatus
 	Test      *bool
-	Start     *uint
-	Count     *uint
+	PageToken *string
+	PageSize  *uint
 }
 
 func (service *Service) SearchAdCreatives(config *SearchAdCreativesConfig) (*[]AdCreative, *errortools.Error) {
 	var values url.Values = url.Values{}
-	var start uint = 0
-	var count uint = countDefault
+	var pageToken string
+	var pageSize uint = countDefault
 
 	values.Set("q", "search")
+
+	var header = http.Header{}
+	header.Set(restliProtocolVersionHeader, defaultRestliProtocolVersion)
 
 	if config != nil {
 		if config.Campaign != nil {
@@ -170,28 +173,29 @@ func (service *Service) SearchAdCreatives(config *SearchAdCreativesConfig) (*[]A
 		if config.Test != nil {
 			values.Set("search.test", fmt.Sprintf("%v", *config.Test))
 		}
-		if config.Start != nil {
-			start = *config.Start
+		if config.PageToken != nil {
+			pageToken = *config.PageToken
 		}
-		if config.Count != nil {
-			count = *config.Count
+		if config.PageSize != nil {
+			pageSize = *config.PageSize
 		}
 	}
 
 	adCreatives := []AdCreative{}
 
 	for {
-		if start > 0 {
-			values.Set("start", fmt.Sprintf("%v", start))
+		if pageToken != "" {
+			values.Set("pageToken", fmt.Sprintf("%v", pageToken))
 		}
-		values.Set("count", fmt.Sprintf("%v", count))
+		values.Set("pageSize", fmt.Sprintf("%v", pageSize))
 
 		adCreativesResponse := AdCreativesResponse{}
 
 		requestConfig := go_http.RequestConfig{
-			Method:        http.MethodGet,
-			Url:           service.urlRest(fmt.Sprintf("adCreatives?%s", values.Encode())),
-			ResponseModel: &adCreativesResponse,
+			Method:            http.MethodGet,
+			Url:               service.urlRest(fmt.Sprintf("adCreatives?%s", values.Encode())),
+			ResponseModel:     &adCreativesResponse,
+			NonDefaultHeaders: &header,
 		}
 		_, _, e := service.versionedHttpRequest(&requestConfig, nil)
 		if e != nil {
@@ -205,16 +209,16 @@ func (service *Service) SearchAdCreatives(config *SearchAdCreativesConfig) (*[]A
 		adCreatives = append(adCreatives, adCreativesResponse.Elements...)
 
 		if config != nil {
-			if config.Start != nil {
+			if config.PageToken != nil {
 				break
 			}
 		}
 
-		if len(adCreativesResponse.Elements) < int(count) {
+		pageToken = adCreativesResponse.MetaData.NextPageToken
+
+		if pageToken == "" {
 			break
 		}
-
-		start += count
 	}
 
 	return &adCreatives, nil

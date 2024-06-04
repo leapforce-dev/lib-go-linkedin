@@ -10,7 +10,7 @@ import (
 )
 
 type AdCampaignGroupsResponse struct {
-	Paging   Paging            `json:"paging"`
+	MetaData MetaData          `json:"metadata"`
 	Elements []AdCampaignGroup `json:"elements"`
 }
 
@@ -39,19 +39,19 @@ const (
 )
 
 type SearchAdCampaignGroupsConfig struct {
-	Account int64
-	Id      *[]int64
-	Status  *[]AdCampaignGroupStatus
-	Name    *[]string
-	Test    *bool
-	Start   *uint
-	Count   *uint
+	Account   int64
+	Id        *[]int64
+	Status    *[]AdCampaignGroupStatus
+	Name      *[]string
+	Test      *bool
+	PageToken *string
+	PageSize  *uint
 }
 
 func (service *Service) SearchAdCampaignGroups(config *SearchAdCampaignGroupsConfig) (*[]AdCampaignGroup, *errortools.Error) {
 	var values url.Values = url.Values{}
-	var start uint = 0
-	var count uint = countDefault
+	var pageToken string
+	var pageSize uint = countDefault
 
 	values.Set("q", "search")
 
@@ -74,22 +74,21 @@ func (service *Service) SearchAdCampaignGroups(config *SearchAdCampaignGroupsCon
 		if config.Test != nil {
 			values.Set("search.test", fmt.Sprintf("%v", *config.Test))
 		}
-		if config.Start != nil {
-			start = *config.Start
+		if config.PageToken != nil {
+			pageToken = *config.PageToken
 		}
-		if config.Count != nil {
-			count = *config.Count
+		if config.PageSize != nil {
+			pageSize = *config.PageSize
 		}
 	}
 
 	adCampaignGroups := []AdCampaignGroup{}
 
 	for {
-		values.Set("q", "search")
-		if start > 0 {
-			values.Set("start", fmt.Sprintf("%v", start))
+		if pageToken != "" {
+			values.Set("pageToken", fmt.Sprintf("%v", pageToken))
 		}
-		values.Set("count", fmt.Sprintf("%v", count))
+		values.Set("pageSize", fmt.Sprintf("%v", pageSize))
 
 		adCampaignGroupsResponse := AdCampaignGroupsResponse{}
 
@@ -110,16 +109,16 @@ func (service *Service) SearchAdCampaignGroups(config *SearchAdCampaignGroupsCon
 		adCampaignGroups = append(adCampaignGroups, adCampaignGroupsResponse.Elements...)
 
 		if config != nil {
-			if config.Start != nil {
+			if config.PageToken != nil {
 				break
 			}
 		}
 
-		if len(adCampaignGroupsResponse.Elements) < int(count) {
+		pageToken = adCampaignGroupsResponse.MetaData.NextPageToken
+
+		if pageToken == "" {
 			break
 		}
-
-		start += count
 	}
 
 	return &adCampaignGroups, nil

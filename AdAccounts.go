@@ -10,7 +10,7 @@ import (
 )
 
 type AdAccountsResponse struct {
-	Paging   Paging      `json:"paging"`
+	MetaData MetaData    `json:"metadata"`
 	Elements []AdAccount `json:"elements"`
 }
 
@@ -54,14 +54,14 @@ type SearchAdAccountsConfig struct {
 	Id        *[]int64
 	Type      *[]AdAccountType
 	Test      *bool
-	Start     *uint
-	Count     *uint
+	PageToken *string
+	PageSize  *uint
 }
 
 func (service *Service) SearchAdAccounts(config *SearchAdAccountsConfig) (*[]AdAccount, *errortools.Error) {
 	var values = url.Values{}
-	var start uint = 0
-	var count uint = countDefault
+	var pageToken string
+	var pageSize uint = countDefault
 
 	values.Set("q", "search")
 
@@ -97,21 +97,21 @@ func (service *Service) SearchAdAccounts(config *SearchAdAccountsConfig) (*[]AdA
 		if config.Test != nil {
 			values.Set("search.test", fmt.Sprintf("%v", *config.Test))
 		}
-		if config.Start != nil {
-			start = *config.Start
+		if config.PageToken != nil {
+			pageToken = *config.PageToken
 		}
-		if config.Count != nil {
-			start = *config.Count
+		if config.PageSize != nil {
+			pageSize = *config.PageSize
 		}
 	}
 
 	adAccounts := []AdAccount{}
 
 	for {
-		if start > 0 {
-			values.Set("start", fmt.Sprintf("%v", start))
+		if pageToken != "" {
+			values.Set("pageToken", fmt.Sprintf("%v", pageToken))
 		}
-		values.Set("count", fmt.Sprintf("%v", count))
+		values.Set("pageSize", fmt.Sprintf("%v", pageSize))
 
 		adAccountsResponse := AdAccountsResponse{}
 
@@ -133,16 +133,16 @@ func (service *Service) SearchAdAccounts(config *SearchAdAccountsConfig) (*[]AdA
 		adAccounts = append(adAccounts, adAccountsResponse.Elements...)
 
 		if config != nil {
-			if config.Start != nil {
+			if config.PageToken != nil {
 				break
 			}
 		}
 
-		if len(adAccountsResponse.Elements) < int(count) {
+		pageToken = adAccountsResponse.MetaData.NextPageToken
+
+		if pageToken == "" {
 			break
 		}
-
-		start += count
 	}
 
 	return &adAccounts, nil

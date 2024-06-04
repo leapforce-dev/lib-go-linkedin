@@ -11,7 +11,7 @@ import (
 )
 
 type AdCampaignsResponse struct {
-	Paging   Paging       `json:"paging"`
+	MetaData MetaData     `json:"metadata"`
 	Elements []AdCampaign `json:"elements"`
 }
 
@@ -88,14 +88,14 @@ type SearchAdCampaignsConfig struct {
 	Type             *[]AdCampaignType
 	Name             *[]string
 	Test             *bool
-	Start            *uint
-	Count            *uint
+	PageToken        *string
+	PageSize         *uint
 }
 
 func (service *Service) SearchAdCampaigns(config *SearchAdCampaignsConfig) (*[]AdCampaign, *errortools.Error) {
 	var values url.Values = url.Values{}
-	var start uint = 0
-	var count uint = countDefault
+	var pageToken string
+	var pageSize uint = countDefault
 
 	values.Set("q", "search")
 
@@ -133,22 +133,21 @@ func (service *Service) SearchAdCampaigns(config *SearchAdCampaignsConfig) (*[]A
 		if config.Test != nil {
 			values.Set("search.test", fmt.Sprintf("%v", *config.Test))
 		}
-		if config.Start != nil {
-			start = *config.Start
+		if config.PageToken != nil {
+			pageToken = *config.PageToken
 		}
-		if config.Count != nil {
-			count = *config.Count
+		if config.PageSize != nil {
+			pageSize = *config.PageSize
 		}
 	}
 
 	adCampaigns := []AdCampaign{}
 
 	for {
-		values.Set("q", "search")
-		if start > 0 {
-			values.Set("start", fmt.Sprintf("%v", start))
+		if pageToken != "" {
+			values.Set("pageToken", fmt.Sprintf("%v", pageToken))
 		}
-		values.Set("count", fmt.Sprintf("%v", count))
+		values.Set("pageSize", fmt.Sprintf("%v", pageSize))
 
 		adCampaignsResponse := AdCampaignsResponse{}
 
@@ -169,16 +168,16 @@ func (service *Service) SearchAdCampaigns(config *SearchAdCampaignsConfig) (*[]A
 		adCampaigns = append(adCampaigns, adCampaignsResponse.Elements...)
 
 		if config != nil {
-			if config.Start != nil {
+			if config.PageToken != nil {
 				break
 			}
 		}
 
-		if len(adCampaignsResponse.Elements) < int(count) {
+		pageToken = adCampaignsResponse.MetaData.NextPageToken
+
+		if pageToken == "" {
 			break
 		}
-
-		start += count
 	}
 
 	return &adCampaigns, nil
