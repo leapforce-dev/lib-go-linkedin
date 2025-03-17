@@ -114,10 +114,12 @@ func (service *Service) CreatePost(post *Post) (string, *errortools.Error) {
 }
 
 type PostsByOwnerConfig struct {
-	OrganizationId int64
-	Fields         *string
-	StartDateUnix  int64
-	EndDateUnix    int64
+	OrganizationId         int64
+	Fields                 *string
+	CreatedStartDateUnix   *int64
+	CreatedEndDateUnix     *int64
+	PublishedStartDateUnix *int64
+	PublishedEndDateUnix   *int64
 }
 
 type PostsByOwnerResponse struct {
@@ -162,12 +164,28 @@ func (service *Service) PostsByOwner(cfg *PostsByOwnerConfig) (*[]Post, *errorto
 
 		for _, post := range postsResponse.Elements {
 
-			if post.CreatedAt > cfg.EndDateUnix {
-				continue
+			if cfg.CreatedEndDateUnix != nil {
+				if post.CreatedAt > *cfg.CreatedEndDateUnix {
+					continue
+				}
 			}
 
-			if post.CreatedAt < cfg.StartDateUnix {
-				continue
+			if cfg.CreatedStartDateUnix != nil {
+				if post.CreatedAt < *cfg.CreatedStartDateUnix {
+					continue
+				}
+			}
+
+			if cfg.PublishedEndDateUnix != nil {
+				if post.PublishedAt > *cfg.PublishedEndDateUnix {
+					continue
+				}
+			}
+
+			if cfg.PublishedStartDateUnix != nil {
+				if post.PublishedAt < *cfg.PublishedStartDateUnix {
+					continue
+				}
 			}
 
 			posts = append(posts, post)
